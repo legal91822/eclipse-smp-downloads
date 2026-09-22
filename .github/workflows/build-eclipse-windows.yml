@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'launcher-src.zip'
+      - '.github/workflows/build-eclipse-windows.yml'
   workflow_dispatch:
 
 permissions:
@@ -32,6 +33,18 @@ jobs:
           if ($candidates.Count -ne 1) { throw "Esperado exatamente 1 projeto Tauri; encontrados $($candidates.Count)." }
           $proj = $candidates[0].DirectoryName
           "ECLIPSE_PROJECT_DIR=$proj" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Corrigir duas chamadas invalidas de replace em launch.rs (teste)
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:ECLIPSE_PROJECT_DIR 'src-tauri/src/launch.rs'
+          if (-not (Test-Path -LiteralPath $source)) { throw 'launch.rs ausente no projeto' }
+          $code = Get-Content -LiteralPath $source -Raw -Encoding utf8
+          $bad = "replace('-','')"
+          $good = 'replace(''-'', "")'
+          $hits = $code.Split(@($bad), [System.StringSplitOptions]::None).Count - 1
+          if ($hits -ne 2) { throw "Esperado exatamente 2 erros de replace; encontrados $hits. Revisar o codigo-fonte." }
+          [System.IO.File]::WriteAllText($source, $code.Replace($bad, $good), [System.Text.UTF8Encoding]::new($false))
 
       - name: Node 22
         uses: actions/setup-node@v4
